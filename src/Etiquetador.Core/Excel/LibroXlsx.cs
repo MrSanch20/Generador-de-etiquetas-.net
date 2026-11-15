@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Xml;
 
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Excel;
 
 /// <summary>Estilos de celda que usan los libros de etiquetas.</summary>
 public enum EstiloCelda

@@ -1,4 +1,4 @@
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Excel;
 
 /// <summary>Guardado de las etiquetas en Excel, listo para importar en GeniusPro (Cembre). Reproduce excel.py.</summary>
 public static class ExcelEtiquetas

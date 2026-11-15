@@ -1,91 +1,4 @@
-namespace Etiquetador.Core;
-
-/// <summary>
-/// Una lista de etiquetas con sus filtros por grupo (regleta, tipo, color…). Es la lógica de cada pestaña
-/// de la ventana, sin nada de interfaz.
-/// </summary>
-public sealed class ListaEtiquetas<T> where T : class, IFila
-{
-    public List<T> Filas { get; private set; } = new();
-    /// <summary>Grupo -> ¿incluido? (en orden de aparición).</summary>
-    public MapaOrdenado<string, bool> Incluir { get; set; } = new();
-    public Func<T, string> Clave { get; set; } = _ => "";
-    public Func<T, string[]> Valores { get; set; } = _ => Array.Empty<string>();
-    public Func<T, string> Texto { get; set; } = _ => "";
-    public Func<T, bool> EsPe { get; set; } = _ => false;
-
-    /// <summary>Carga las filas, respetando las casillas de grupo que ya estaban tocadas.</summary>
-    public void Cargar(IEnumerable<T> filas, ISet<string>? activos = null)
-    {
-        Filas = filas.ToList();
-        var antes = Incluir.Pares().ToDictionary(p => p.Key, p => p.Value);
-        Incluir = new MapaOrdenado<string, bool>();
-        var cuenta = new MapaOrdenado<string, int>();
-        foreach (var f in Filas)
-        {
-            var k = Clave(f);
-            cuenta[k] = (cuenta.Contiene(k) ? cuenta[k] : 0) + 1;
-        }
-        foreach (var (grupo, _) in cuenta.Pares())
-            Incluir[grupo] = antes.TryGetValue(grupo, out var v) ? v : (activos == null || activos.Contains(grupo));
-    }
-
-    public IReadOnlyList<KeyValuePair<string, int>> Grupos()
-    {
-        var cuenta = new MapaOrdenado<string, int>();
-        foreach (var f in Filas)
-        {
-            var k = Clave(f);
-            cuenta[k] = (cuenta.Contiene(k) ? cuenta[k] : 0) + 1;
-        }
-        return cuenta.Pares().ToList();
-    }
-
-    public bool GrupoIncluido(string grupo) => Incluir.TryGetValue(grupo, out var v) && v;
-    public void MarcarGrupo(string grupo, bool valor) { if (Incluir.Contiene(grupo)) Incluir[grupo] = valor; }
-    public void MarcarTodos(bool valor) { foreach (var k in Incluir.Claves.ToList()) Incluir[k] = valor; }
-
-    public List<T> Incluidas() => Filas.Where(f => GrupoIncluido(Clave(f))).ToList();
-
-    /// <summary>¿La fila pasa el texto de búsqueda (en minúsculas)? Sin texto, todas.</summary>
-    public bool Pasa(T f, string q) =>
-        q.Length == 0 || Valores(f).Any(v => v.ToLowerInvariant().Contains(q, StringComparison.Ordinal));
-
-    /// <summary>Pone el SW-CODE en las filas dadas.</summary>
-    public static void PonerSwcode(IEnumerable<T> filas, string codigo)
-    {
-        foreach (var f in filas) f.SwCode = codigo.Trim();
-    }
-}
-
-/// <summary>Lo que se ha leído de un archivo (para pasarlo luego a la sesión).</summary>
-public sealed class ResultadoArchivo
-{
-    public string Ruta { get; init; } = "";
-    public string Nombre { get; init; } = "";
-    public List<Borna> Bornas { get; init; } = new();
-    public List<Elemento> Elementos { get; init; } = new();
-    public List<Cable> Cables { get; init; } = new();
-    public List<int> Ocr { get; init; } = new();
-    public List<int> SinOcr { get; init; } = new();
-    public string? Error { get; init; }
-}
-
-/// <summary>Resumen de una carga para enseñárselo al usuario.</summary>
-public sealed class ResumenCarga
-{
-    public List<string> Errores { get; } = new();
-    public List<string> AvisosOcr { get; } = new();
-    public List<string> AvisosSinOcr { get; } = new();
-    public List<string> Resumen { get; } = new();
-    public int SinNumero { get; set; }
-    public int PaginasSinOcr { get; set; }
-    public bool HayFilasNuevas { get; set; }
-    /// <summary>Texto para la barra de estado (null si no hay nada que decir).</summary>
-    public string? Estado { get; set; }
-}
-
-public enum Que { Bornas, Elementos, CablesFuerza, CablesManiobra, Todo }
+namespace Etiquetador.Core.Aplicacion;
 
 /// <summary>
 /// Todo el estado y la lógica del programa, sin interfaz: lo cargado, los filtros, el SW-CODE, las copias por esquema
@@ -151,7 +64,7 @@ public sealed class Sesion
     public List<string> Preparar(IEnumerable<string> rutasEntrada, bool anadir, out List<string> malos, out List<string> repetidos)
     {
         var rutas = rutasEntrada.ToList();
-        malos = rutas.Where(r => Lectores.TipoArchivo(r) == null).ToList();
+        malos = rutas.Where(r => LectorArchivos.TipoArchivo(r) == null).ToList();
         var malosLocal = malos;
         rutas = rutas.Where(r => !malosLocal.Contains(r)).ToList();
         if (rutas.Count == 0) { repetidos = new List<string>(); return rutas; }
@@ -162,35 +75,6 @@ public sealed class Sesion
         rutas = rutas.Where(r => !repetidosLocal.Contains(r)).ToList();
         if (rutas.Count > 0) RutaActual = rutas[^1];
         return rutas;
-    }
-
-    /// <summary>Lee un esquema (PDF, DXF, DWG o imagen). Se puede llamar desde otro hilo.</summary>
-    public static ResultadoArchivo Leer(string ruta, Action<string>? progreso = null)
-    {
-        try
-        {
-            var paginas = Lectores.LeerPaginas(ruta, progreso);
-            progreso?.Invoke("buscando bornas y elementos…");
-            var bornas = Extraccion.ExtraerBornas(paginas);
-            var elementos = Extraccion.ExtraerElementos(paginas);
-            var cables = Extraccion.ExtraerCables(paginas);
-            // páginas leídas con OCR que han aportado bornas o elementos (para avisar)
-            var usadas = new HashSet<object>();
-            foreach (var b in bornas) usadas.Add(b.Pagina);
-            foreach (var e in elementos) foreach (var n in e.Paginas) usadas.Add(n);
-            var ocr = paginas.Where(p => p.Origen == "ocr" && usadas.Contains(p.Numero)).Select(p => p.Numero).ToList();
-            var sinOcr = paginas.Where(p => p.SinOcr).Select(p => p.Numero).ToList();
-            var nombre = Extraccion.NumeroEsquema(paginas) ?? NombreDe(ruta);
-            return new ResultadoArchivo { Ruta = ruta, Nombre = nombre, Bornas = bornas, Elementos = elementos, Cables = cables, Ocr = ocr, SinOcr = sinOcr };
-        }
-        catch (ErrorLectura e)
-        {
-            return new ResultadoArchivo { Ruta = ruta, Nombre = NombreDe(ruta), Error = e.Message };
-        }
-        catch (Exception e)
-        {
-            return new ResultadoArchivo { Ruta = ruta, Nombre = NombreDe(ruta), Error = $"No se ha podido leer el archivo:\n{e.Message}" };
-        }
     }
 
     /// <summary>Añade a la sesión lo leído de uno o varios archivos.</summary>
@@ -211,7 +95,7 @@ public sealed class Sesion
             if (r.Error != null) { res.Errores.Add($"{archivo}:\n{r.Error}"); continue; }
             if (ya.Contains(r.Nombre)) { res.Errores.Add($"{archivo}:\nel esquema {r.Nombre} ya estaba cargado."); continue; }
             ya.Add(r.Nombre);
-            var elementos = Extraccion.SoloPlaca(r.Elementos);
+            var elementos = ExtractorElementos.SoloPlaca(r.Elementos);
             res.SinNumero += r.Cables.Count(c => c.Numero.Length == 0);
             var cables = r.Cables.Where(c => c.Numero.Length > 0).ToList();    // los hilos sin número no llevan etiqueta
             if (r.Bornas.Count == 0 && elementos.Count == 0 && cables.Count == 0)
@@ -273,7 +157,7 @@ public sealed class Sesion
     public string IncorporarTabla(string ruta, IReadOnlyList<IReadOnlyList<string>> filas, int? cabecera,
                                   IReadOnlyDictionary<string, int?> columnas, string modo)
     {
-        var (bornas, elementos) = Extraccion.FilasDesdeTabla(filas, cabecera, columnas, modo);
+        var (bornas, elementos) = ImportadorTabla.FilasDesde(filas, cabecera, columnas, modo);
         string nombre = NombreDe(ruta), archivo = Path.GetFileName(ruta);
         if (bornas.Count == 0 && elementos.Count == 0)
             throw new ErrorLectura("No he encontrado datos en esas columnas. Revisa la columna elegida.");
@@ -285,7 +169,7 @@ public sealed class Sesion
             PonerCopiasPorDefecto();
             return $"Listo: {bornas.Count} bornas del listado {archivo}.";
         }
-        var datos = Extraccion.SoloPlaca(elementos);
+        var datos = ExtractorElementos.SoloPlaca(elementos);
         foreach (var f in datos) f.Esquema = nombre;
         CargarElementos(Elementos.Filas.Concat(datos).ToList(), datos);
         PonerCopiasPorDefecto();
@@ -415,10 +299,10 @@ public sealed class Sesion
     // ---------------------------------------------------------------------
     // Copias y guardado
     // ---------------------------------------------------------------------
-    public List<T> ConCopias<T>(IEnumerable<T> filas) where T : class, IFila => Extraccion.Multiplicar(filas, Copias);
+    public List<T> ConCopias<T>(IEnumerable<T> filas) where T : class, IFila => Multiplicador.Multiplicar(filas, Copias);
 
     /// <summary>Etiquetas de cable a imprimir: con copias y una para cada extremo del hilo.</summary>
-    public List<Cable> EtiquetasCables(string clase) => Extraccion.PorExtremos(ConCopias(Cables(clase).Incluidas()));
+    public List<Cable> EtiquetasCables(string clase) => Multiplicador.PorExtremos(ConCopias(Cables(clase).Incluidas()));
 
     public bool AlgunaCopiaMultiple => Esquemas().Count > 0 && Copias.Values.Any(n => n > 1);
 

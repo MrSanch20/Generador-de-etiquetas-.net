@@ -19,10 +19,10 @@ static JsonNode? Nodo(object? v) => v switch
 
 static (List<Pagina> Paginas, List<Borna> Bornas, List<Elemento> Elementos, List<Cable> Cables) Leer(string ruta)
 {
-    var paginas = Lectores.LeerPaginas(ruta, _ => { });
-    var bornas = Extraccion.ExtraerBornas(paginas);
-    var elementos = Extraccion.SoloPlaca(Extraccion.ExtraerElementos(paginas));
-    var cables = Extraccion.ExtraerCables(paginas);
+    var paginas = LectorArchivos.LeerPaginas(ruta, _ => { });
+    var bornas = ExtractorBornas.Extraer(paginas);
+    var elementos = ExtractorElementos.SoloPlaca(ExtractorElementos.Extraer(paginas));
+    var cables = ExtractorCables.Extraer(paginas);
     return (paginas, bornas, elementos, cables);
 }
 
@@ -63,7 +63,7 @@ try
             var raiz = new JsonObject
             {
                 ["paginas"] = paginas.Count,
-                ["numero_esquema"] = Nodo(Extraccion.NumeroEsquema(paginas)),
+                ["numero_esquema"] = Nodo(IdentificadorEsquema.Buscar(paginas)),
                 ["bornas"] = new JsonArray(bornas.Select(b => (JsonNode?)new JsonObject
                 {
                     ["regleta"] = b.Regleta, ["pos"] = b.Pos, ["marca"] = b.Marca, ["descripcion"] = b.Descripcion, ["pagina"] = Nodo(b.Pagina),
@@ -85,8 +85,8 @@ try
         case "--tabla" when args.Length >= 3:
         {
             var filas = LectorTabla.Leer(archivo);
-            var an = Extraccion.AnalizarTabla(filas.Select(f => (IReadOnlyList<string>)f).ToList());
-            var (bs, es) = Extraccion.FilasDesdeTabla(filas.Select(f => (IReadOnlyList<string>)f).ToList(), an.Cabecera, an.Columnas, an.Modo);
+            var an = ImportadorTabla.Analizar(filas.Select(f => (IReadOnlyList<string>)f).ToList());
+            var (bs, es) = ImportadorTabla.FilasDesde(filas.Select(f => (IReadOnlyList<string>)f).ToList(), an.Cabecera, an.Columnas, an.Modo);
             var raiz = new JsonObject
             {
                 ["filas"] = new JsonArray(filas.Select(f => (JsonNode?)new JsonArray(f.Select(c => (JsonNode?)JsonValue.Create(c)).ToArray())).ToArray()),
@@ -110,12 +110,12 @@ try
         {
             var (paginas, bornas, elementos, cablesTodos) = Leer(archivo);
             var cables = cablesTodos.Where(c => c.Numero.Length > 0).ToList();
-            string esq = Extraccion.NumeroEsquema(paginas) ?? Path.GetFileNameWithoutExtension(archivo);
+            string esq = IdentificadorEsquema.Buscar(paginas) ?? Path.GetFileNameWithoutExtension(archivo);
             foreach (var f in bornas) f.Esquema = esq;
             foreach (var f in elementos) { f.Esquema = esq; f.SwCode = Config.SwcodeElementosDefecto; }
             foreach (var f in cables) f.Esquema = esq;
-            var fuerza = Extraccion.PorExtremos(cables.Where(c => c.Tipo == "Fuerza"));
-            var maniobra = Extraccion.PorExtremos(cables.Where(c => c.Tipo == "Maniobra"));
+            var fuerza = Multiplicador.PorExtremos(cables.Where(c => c.Tipo == "Fuerza"));
+            var maniobra = Multiplicador.PorExtremos(cables.Where(c => c.Tipo == "Maniobra"));
             ExcelEtiquetas.GuardarTodo(bornas, elementos, args[2], fuerza, maniobra);
             return 0;
         }

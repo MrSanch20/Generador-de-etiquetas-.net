@@ -1,7 +1,7 @@
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Lectura;
 
 /// <summary>
-/// Lectores de archivos.
+/// LectorArchivos de archivos.
 ///
 /// Cada lector convierte un archivo (PDF, DXF/DWG, imagen escaneada) en una lista de páginas
 /// con sus textos y posiciones, en un formato común. Así la lógica de bornas y elementos
@@ -10,7 +10,7 @@ namespace Etiquetador.Core;
 /// Coordenadas: como en un PDF, con el origen arriba a la izquierda y la Y hacia abajo, y
 /// escaladas para que el alto de página sea ~842 (un A3/A4 en puntos).
 /// </summary>
-public static class Lectores
+public static class LectorArchivos
 {
     public const double AltoRef = 841.89;     // alto de página de referencia (puntos)
 

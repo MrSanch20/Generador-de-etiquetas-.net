@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Lectura;
 
 /// <summary>
 /// Lectura de DXF de AutoCAD (texto ASCII) sin dependencias: TEXT, MTEXT y ATTRIB (también dentro de bloques),
@@ -258,8 +258,8 @@ public static class LectorDxf
         }
         double xmin = xs.Min(), xmax = xs.Max(), ymin = ys.Min(), ymax = ys.Max();
         double altoPag = Math.Max(ymax - ymin, 1e-6) * 1.02;
-        double esc = Lectores.AltoRef / altoPag;
-        var pag = new Pagina(numero, (xmax - xmin) * esc, Lectores.AltoRef, origen);
+        double esc = LectorArchivos.AltoRef / altoPag;
+        var pag = new Pagina(numero, (xmax - xmin) * esc, LectorArchivos.AltoRef, origen);
         foreach (var t in textos)
         {
             double r = ((t.Rot % 360) + 360) % 360;

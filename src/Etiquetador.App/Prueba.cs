@@ -10,10 +10,10 @@ internal static class Prueba
         var lineas = new List<string>();
         try
         {
-            var paginas = Lectores.LeerPaginas(ruta, _ => { });
-            var bornas = Extraccion.ExtraerBornas(paginas);
-            var elementos = Extraccion.SoloPlaca(Extraccion.ExtraerElementos(paginas));
-            var cables = Extraccion.ExtraerCables(paginas).Where(c => c.Numero.Length > 0).ToList();
+            var paginas = LectorArchivos.LeerPaginas(ruta, _ => { });
+            var bornas = ExtractorBornas.Extraer(paginas);
+            var elementos = ExtractorElementos.SoloPlaca(ExtractorElementos.Extraer(paginas));
+            var cables = ExtractorCables.Extraer(paginas).Where(c => c.Numero.Length > 0).ToList();
             lineas.Add($"cables_fuerza={cables.Count(c => c.Tipo == "Fuerza")}");
             lineas.Add($"cables_maniobra={cables.Count(c => c.Tipo == "Maniobra")}");
             lineas.Add($"paginas={paginas.Count}");

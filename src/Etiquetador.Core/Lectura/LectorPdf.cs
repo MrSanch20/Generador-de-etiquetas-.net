@@ -4,7 +4,7 @@ using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Graphics;
 using UglyToad.PdfPig.Graphics.Colors;
 
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Lectura;
 
 /// <summary>
 /// Lectura de PDF con PdfPig (Apache-2.0). Hace lo mismo que la versión Python con pdfplumber:
@@ -57,8 +57,8 @@ public static class LectorPdf
                 }
 
                 double alto = page.Height;
-                double esc = Lectores.AltoRef / alto;
-                var pag = new Pagina(num, page.Width * esc, Lectores.AltoRef);
+                double esc = LectorArchivos.AltoRef / alto;
+                var pag = new Pagina(num, page.Width * esc, LectorArchivos.AltoRef);
 
                 List<CaracterPdf> chars;
                 try { chars = Caracteres(page); }
@@ -105,7 +105,7 @@ public static class LectorPdf
 
     /// <summary>¿Tiene la página textos de color de cable (NE, MA, AZ…)? Barato de comprobar.</summary>
     private static bool LlevaCables(Pagina pag) =>
-        pag.Trozos.Any(t => t.Dir == Direccion.Horizontal && Rx.Completa(Extraccion.ColorCableRe, t.Texto));
+        pag.Trozos.Any(t => t.Dir == Direccion.Horizontal && Rx.Completa(ExtractorCables.ColorCableRe, t.Texto));
 
     // ----------------------------------------------------------------------
     // Texto

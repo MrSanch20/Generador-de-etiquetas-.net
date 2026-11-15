@@ -1,4 +1,4 @@
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Aplicacion;
 
 /// <summary>
 /// Datos de ejemplo INVENTADOS, para enseñar el programa sin usar esquemas reales:
@@ -38,7 +38,7 @@ public static class Demo
     private static List<Elemento> Elementos(string esquema, IEnumerable<(string, int)> lista) =>
         lista.Select(x => new Elemento
         {
-            Esquema = esquema, Designacion = x.Item1, Tipo = Extraccion.TipoEquipo(x.Item1), Ubicacion = "Placa",
+            Esquema = esquema, Designacion = x.Item1, Tipo = Designaciones.TipoEquipo(x.Item1), Ubicacion = "Placa",
             Paginas = new List<object> { x.Item2 }, SwCode = "181",
         }).ToList();
 

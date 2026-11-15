@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Lectura;
 
 /// <summary>Tablas (Excel / CSV): listados exportados del programa de esquemas. Lector de .xlsx propio, sin dependencias.</summary>
 public static class LectorTabla

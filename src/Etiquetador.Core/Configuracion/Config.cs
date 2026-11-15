@@ -2,7 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Configuracion;
 
 /// <summary>
 /// Ajustes que el programa recuerda entre usos (en %APPDATA%\EtiquetadorCuadros\config.json,

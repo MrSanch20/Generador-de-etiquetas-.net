@@ -1,4 +1,4 @@
-namespace Etiquetador.Core;
+namespace Etiquetador.Core.Lectura;
 
 /// <summary>
 /// Motor de reconocimiento de texto (OCR) que se puede enchufar al programa. La versión Python usa RapidOCR;

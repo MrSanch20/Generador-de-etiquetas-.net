@@ -101,7 +101,7 @@ public sealed class MainWindow : Window
 
         Fila(raiz, new TextBlock
         {
-            Text = "Formatos admitidos:  " + string.Join("  ", Lectores.ExtensionesAdmitidas()),
+            Text = "Formatos admitidos:  " + string.Join("  ", LectorArchivos.ExtensionesAdmitidas()),
             Foreground = Dialogos.Gris, Margin = new Thickness(0, 6, 0, 4),
         }, 1);
 
@@ -175,7 +175,7 @@ public sealed class MainWindow : Window
     // ---------------------------------------------------------------------
     private async Task MostrarFormatos()
     {
-        string texto = string.Join("\n\n", Lectores.Formatos.Select(f => $"{f.Nombre}  ({string.Join("  ", f.Extensiones)})\n{f.Nota}"));
+        string texto = string.Join("\n\n", LectorArchivos.Formatos.Select(f => $"{f.Nombre}  ({string.Join("  ", f.Extensiones)})\n{f.Nota}"));
         texto += "\n\nOCR en este programa: " + (LectorOcr.Disponible
             ? "SÍ incluido."
             : "NO incluido (no lee planos escaneados ni imágenes). Usa PDF con texto, DXF o listados Excel/CSV.");
@@ -186,10 +186,10 @@ public sealed class MainWindow : Window
     {
         var tipos = new List<FilePickerFileType>
         {
-            new("Esquemas y listados") { Patterns = Lectores.ExtensionesAdmitidas().Select(e => "*" + e).ToList() },
+            new("Esquemas y listados") { Patterns = LectorArchivos.ExtensionesAdmitidas().Select(e => "*" + e).ToList() },
             new("PDF") { Patterns = new[] { "*.pdf" } },
             new("AutoCAD (DXF, DWG)") { Patterns = new[] { "*.dxf", "*.dwg" } },
-            new("Imagen escaneada") { Patterns = Lectores.ExtImagen.Select(e => "*" + e).ToList() },
+            new("Imagen escaneada") { Patterns = LectorArchivos.ExtImagen.Select(e => "*" + e).ToList() },
             new("Listado Excel / CSV") { Patterns = new[] { "*.xlsx", "*.xlsm", "*.csv", "*.txt" } },
             FilePickerFileTypes.All,
         };
@@ -210,14 +210,14 @@ public sealed class MainWindow : Window
         var rutas = _s.Preparar(rutasEntrada, anadir, out var malos, out var repetidos);
         if (malos.Count > 0)
             await Aviso("Formato no reconocido: " + string.Join(", ", malos.Select(Path.GetFileName))
-                        + "\n\nExtensiones admitidas:\n" + string.Join("  ", Lectores.ExtensionesAdmitidas())
+                        + "\n\nExtensiones admitidas:\n" + string.Join("  ", LectorArchivos.ExtensionesAdmitidas())
                         + "\n\nPulsa «Formatos admitidos» para ver qué hace cada una.");
         if (repetidos.Count > 0)
             await Aviso("Ya estaban cargados (no se añaden otra vez):\n" + string.Join("\n", repetidos.Select(Path.GetFileName)));
         RefrescarTodo();
         if (rutas.Count == 0) return;
-        var tablas = rutas.Where(r => Lectores.TipoArchivo(r) == "tabla").ToList();
-        var esquemas = rutas.Where(r => Lectores.TipoArchivo(r) != "tabla").ToList();
+        var tablas = rutas.Where(r => LectorArchivos.TipoArchivo(r) == "tabla").ToList();
+        var esquemas = rutas.Where(r => LectorArchivos.TipoArchivo(r) != "tabla").ToList();
         if (esquemas.Count == 0)
         {
             foreach (var t in tablas) await AbrirTabla(t);
@@ -234,7 +234,7 @@ public sealed class MainWindow : Window
                 for (int i = 0; i < esquemas.Count; i++)
                 {
                     string prefijo = esquemas.Count > 1 ? $"Esquema {i + 1} de {esquemas.Count} ({Path.GetFileName(esquemas[i])}): " : "";
-                    lista.Add(Sesion.Leer(esquemas[i], m => Dispatcher.UIThread.Post(() => Estado(prefijo + m))));
+                    lista.Add(CargadorEsquemas.Leer(esquemas[i], m => Dispatcher.UIThread.Post(() => Estado(prefijo + m))));
                 }
                 return lista;
             });
@@ -275,7 +275,7 @@ public sealed class MainWindow : Window
             await Aviso($"{Path.GetFileName(ruta)}:\n{e.Message}");
             return;
         }
-        var propuesta = Extraccion.AnalizarTabla(filas.Select(f => (IReadOnlyList<string>)f).ToList());
+        var propuesta = ImportadorTabla.Analizar(filas.Select(f => (IReadOnlyList<string>)f).ToList());
         var dlg = new DialogoTabla(Path.GetFileName(ruta), filas, propuesta);
         var r = await dlg.Mostrar(this);
         if (r == null) return;
