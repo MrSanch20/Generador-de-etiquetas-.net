@@ -1,4 +1,3 @@
-using Etiquetador.Core;
 
 namespace Etiquetador.App;
 

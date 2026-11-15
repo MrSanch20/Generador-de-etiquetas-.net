@@ -1,12 +1,9 @@
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using Etiquetador.Core;
 
 namespace Etiquetador.App;
 
@@ -19,13 +16,14 @@ public sealed class MainWindow : Window
     private readonly ListaView<Elemento> _elementos;
     private readonly ListaView<Cable> _fuerza;
     private readonly ListaView<Cable> _maniobra;
-    private readonly TablaView _todo;
+    private readonly VistaTodo _todo;
+    private readonly PanelCopias _panelCopias;
+    private readonly ExportadorEtiquetas _exportador;
     private readonly TabControl _pestanas = new();
     private readonly TextBox _busqueda = new() { Width = 260 };
     private readonly TextBlock _lblPdf = new();
     private readonly TextBlock _lblTags = new() { FontSize = 16, FontWeight = FontWeight.Bold };
     private readonly TextBlock _lblEstado = new() { Foreground = Dialogos.Gris, TextTrimming = TextTrimming.CharacterEllipsis };
-    private readonly WrapPanel _panelCopias = new();
     private readonly Button _btnAbrir = new() { Content = "Abrir esquema…" };
     private readonly Button _btnAnadir = new() { Content = "Añadir esquema…" };
     private readonly Button _btnLimpiar = new() { Content = "Limpiar todo" };
@@ -66,23 +64,15 @@ public sealed class MainWindow : Window
             (filas, codigo) => _s.PonerSwcodeCables("maniobra", filas, codigo), () => Busqueda(), Aviso,
             ("Pasar a fuerza", filas => MoverCables(filas, "maniobra")));
 
-        // Pestaña "Todo": bornas, elementos y cables juntos (usa los filtros de las otras)
-        _todo = new TablaView(new[]
-        {
-            new ColumnaTabla("Esquema", 150), new ColumnaTabla("Etiqueta", 100), new ColumnaTabla("Texto", 110),
-            new ColumnaTabla("Regleta / tipo", 190), new ColumnaTabla("Descripción", 260, Estirar: true),
-            new ColumnaTabla("Pág.", 90), new ColumnaTabla("SW-CODE", 80),
-        });
-        var todoPanel = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), Margin = new Thickness(0, 8, 0, 0) };
-        var todoNota = new TextBlock { Text = "Bornas, elementos y cables juntos. Usa los filtros de las otras pestañas.", Foreground = Dialogos.Gris, Margin = new Thickness(0, 0, 0, 6) };
-        Grid.SetRow(todoNota, 0); Grid.SetRow(_todo, 1);
-        todoPanel.Children.Add(todoNota); todoPanel.Children.Add(_todo);
+        _todo = new VistaTodo(_s);
+        _panelCopias = new PanelCopias(_s, Pintar, QuitarEsquema);
+        _exportador = new ExportadorEtiquetas(this, _s, Estado, Aviso, AppName);
 
         _pestanas.Items.Add(new TabItem { Header = "Bornas", Content = _bornas });
         _pestanas.Items.Add(new TabItem { Header = "Elementos", Content = _elementos });
         _pestanas.Items.Add(new TabItem { Header = "Cables fuerza", Content = _fuerza });
         _pestanas.Items.Add(new TabItem { Header = "Cables maniobra", Content = _maniobra });
-        _pestanas.Items.Add(new TabItem { Header = "Todo", Content = todoPanel });
+        _pestanas.Items.Add(new TabItem { Header = "Todo", Content = _todo });
         _pestanas.SelectionChanged += (_, e) => { if (e.Source == _pestanas) ActualizarBotones(); };
 
         // ---- cuerpo ----
@@ -110,7 +100,6 @@ public sealed class MainWindow : Window
         info.Children.Add(_lblPdf); info.Children.Add(_lblTags);
         Fila(raiz, info, 2);
 
-        _panelCopias.Margin = new Thickness(0, 0, 0, 6);
         Fila(raiz, _panelCopias, 3);
 
         var barra = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 0, 0, 6) };
@@ -134,12 +123,12 @@ public sealed class MainWindow : Window
         Content = raiz;
 
         // ---- eventos ----
-        btnFormatos.Click += async (_, _) => await MostrarFormatos();
+        btnFormatos.Click += async (_, _) => await SelectorArchivos.MostrarFormatos(this);
         _btnAbrir.Click += async (_, _) => await ElegirArchivo(anadir: false);
         _btnAnadir.Click += async (_, _) => await ElegirArchivo(anadir: true);
         _btnLimpiar.Click += async (_, _) => await LimpiarTodo();
-        _btnExcel.Click += async (_, _) => await Guardar();
-        _btnCopiar.Click += async (_, _) => await Copiar();
+        _btnExcel.Click += async (_, _) => await _exportador.Guardar(QueActual);
+        _btnCopiar.Click += async (_, _) => await _exportador.Copiar(QueActual);
         _busqueda.TextChanged += (_, _) => Pintar();
 
         DragDrop.SetAllowDrop(this, true);
@@ -173,33 +162,9 @@ public sealed class MainWindow : Window
     // ---------------------------------------------------------------------
     // Acciones
     // ---------------------------------------------------------------------
-    private async Task MostrarFormatos()
-    {
-        string texto = string.Join("\n\n", LectorArchivos.Formatos.Select(f => $"{f.Nombre}  ({string.Join("  ", f.Extensiones)})\n{f.Nota}"));
-        texto += "\n\nOCR en este programa: " + (LectorOcr.Disponible
-            ? "SÍ incluido."
-            : "NO incluido (no lee planos escaneados ni imágenes). Usa PDF con texto, DXF o listados Excel/CSV.");
-        await Dialogos.Mensaje(this, "Formatos admitidos", texto);
-    }
-
     private async Task ElegirArchivo(bool anadir)
     {
-        var tipos = new List<FilePickerFileType>
-        {
-            new("Esquemas y listados") { Patterns = LectorArchivos.ExtensionesAdmitidas().Select(e => "*" + e).ToList() },
-            new("PDF") { Patterns = new[] { "*.pdf" } },
-            new("AutoCAD (DXF, DWG)") { Patterns = new[] { "*.dxf", "*.dwg" } },
-            new("Imagen escaneada") { Patterns = LectorArchivos.ExtImagen.Select(e => "*" + e).ToList() },
-            new("Listado Excel / CSV") { Patterns = new[] { "*.xlsx", "*.xlsm", "*.csv", "*.txt" } },
-            FilePickerFileTypes.All,
-        };
-        var archivos = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = anadir ? "Añadir esquemas" : "Elegir esquemas (puedes elegir varios)",
-            AllowMultiple = true,
-            FileTypeFilter = tipos,
-        });
-        var rutas = archivos.Select(a => a.TryGetLocalPath()).OfType<string>().ToList();
+        var rutas = await SelectorArchivos.Elegir(this, anadir);
         if (rutas.Count > 0) await Abrir(rutas, anadir);
     }
 
@@ -346,38 +311,8 @@ public sealed class MainWindow : Window
     {
         _bornas.Refrescar(); _elementos.Refrescar(); _fuerza.Refrescar(); _maniobra.Refrescar();
         _lblPdf.Text = _s.Cabecera();
-        PintarCopias();
+        _panelCopias.Refrescar();
         Pintar();
-    }
-
-    /// <summary>Una casilla «Copias» por esquema. Se conserva lo que ya se había puesto.</summary>
-    private void PintarCopias()
-    {
-        _panelCopias.Children.Clear();
-        var esquemas = _s.Esquemas();
-        if (esquemas.Count == 0) return;
-        _panelCopias.Children.Add(new TextBlock { Text = "Copias:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
-        foreach (var esq in esquemas)
-        {
-            var e = esq;
-            var caja = new NumericUpDown
-            {
-                Minimum = 1, Maximum = 99, Increment = 1, FormatString = "0", Width = 110,
-                Value = _s.Copias.GetValueOrDefault(e, 1),
-            };
-            caja.ValueChanged += (_, args) =>
-            {
-                _s.Copias[e] = (int)Math.Max(1, args.NewValue ?? 1);
-                Pintar();
-            };
-            var quitar = new Button { Content = "✕", Margin = new Thickness(4, 0, 0, 0) };
-            quitar.Click += async (_, _) => await QuitarEsquema(e);
-            var celda = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 1, 18, 1) };
-            celda.Children.Add(new TextBlock { Text = e, VerticalAlignment = VerticalAlignment.Center });
-            celda.Children.Add(caja); celda.Children.Add(quitar);
-            _panelCopias.Children.Add(celda);
-        }
-        _panelCopias.Children.Add(new TextBlock { Text = "(✕ quita el esquema)", Foreground = Dialogos.Gris, VerticalAlignment = VerticalAlignment.Center });
     }
 
     private Que QueActual => _pestanas.SelectedIndex switch
@@ -392,21 +327,7 @@ public sealed class MainWindow : Window
         _elementos.Pintar(q);
         _fuerza.Pintar(q); _maniobra.Pintar(q);
 
-        // pestaña Todo
-        var filas = new List<FilaVista>();
-        void Anadir(string[] vals)
-        {
-            if (q.Length == 0 || vals.Any(v => v.ToLowerInvariant().Contains(q, StringComparison.Ordinal)))
-                filas.Add(new FilaVista { Vals = vals });
-        }
-        foreach (var f in _s.Bornas.Incluidas())
-            Anadir(new[] { f.Esquema, "Borna", f.Marca, f.Regleta, f.Descripcion, Convert.ToString(f.Pagina) ?? "", f.SwCode });
-        foreach (var e in _s.Elementos.Incluidas())
-            Anadir(new[] { e.Esquema, "Elemento", e.Designacion, e.Tipo, "", e.PaginasTexto, e.SwCode });
-        foreach (var (clase, nombre) in new[] { ("fuerza", "Cable fuerza"), ("maniobra", "Cable maniobra") })
-            foreach (var c in _s.Cables(clase).Incluidas())
-                Anadir(new[] { c.Esquema, nombre, c.Numero, c.Color, "", c.Pagina.ToString(), c.SwCode });
-        _todo.Poner(filas);
+        _todo.Pintar(q);
 
         _lblTags.Text = _s.ResumenEtiquetas();
         ActualizarBotones();
@@ -420,54 +341,5 @@ public sealed class MainWindow : Window
         _btnExcel.Content = $"Guardar Excel de {Sesion.NombreQue(que)}…";
         _btnExcel.IsEnabled = n > 0;
         _btnCopiar.IsEnabled = n > 0;
-    }
-
-    // ---------------------------------------------------------------------
-    // Guardar / copiar
-    // ---------------------------------------------------------------------
-    private async Task Guardar()
-    {
-        var que = QueActual;
-        string nombreQue = Sesion.NombreQue(que);
-        IStorageFolder? carpeta = null;
-        try
-        {
-            if (_s.RutaActual != null)
-                carpeta = await StorageProvider.TryGetFolderFromPathAsync(Path.GetDirectoryName(_s.RutaActual) ?? "");
-        }
-        catch (Exception) { }
-        var archivo = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = $"Guardar Excel de {nombreQue}",
-            DefaultExtension = "xlsx",
-            SuggestedFileName = _s.NombreExcelPropuesto(que),
-            SuggestedStartLocation = carpeta,
-            FileTypeChoices = new[] { new FilePickerFileType("Excel") { Patterns = new[] { "*.xlsx" } } },
-        });
-        var ruta = archivo?.TryGetLocalPath();
-        if (ruta == null) return;
-        try
-        {
-            _s.GuardarExcel(que, ruta);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            await Aviso("No se puede guardar: ese Excel está abierto. Ciérralo y vuelve a intentarlo.");
-            return;
-        }
-        Estado($"Excel de {nombreQue} guardado: {Path.GetFileName(ruta)} ({_s.Textos(que).Count} etiquetas)");
-        if (OperatingSystem.IsWindows() && await Dialogos.Preguntar(this, AppName, $"Excel de {nombreQue} guardado.\n¿Quieres abrirlo ahora?"))
-        {
-            try { Process.Start(new ProcessStartInfo(ruta) { UseShellExecute = true }); }
-            catch (Exception) { }
-        }
-    }
-
-    private async Task Copiar()
-    {
-        var que = QueActual;
-        var textos = _s.Textos(que);
-        if (Clipboard != null) await Clipboard.SetTextAsync(string.Join("\n", textos));
-        Estado($"Copiadas {textos.Count} etiquetas ({Sesion.NombreQue(que)}), una por línea. Pégalas en Excel o en GeniusPro.");
     }
 }

@@ -16,7 +16,8 @@ src/
 │  ├─ Aplicacion/          Sesion (estado), CargadorEsquemas (leer un esquema entero), ListaEtiquetas, ResultadoArchivo, ResumenCarga, Que, Demo
 │  └─ Utilidades/          MapaOrdenado, Rx (regex), Redondeo (el .5 al par, como Python)
 ├─ Etiquetador.Cli         Línea de comandos / pruebas
-└─ Etiquetador.App         Ventana Avalonia (MainWindow, TablaView, ListaView, DialogoTabla, Dialogos)
+└─ Etiquetador.App         Ventana Avalonia: MainWindow (monta y conecta) + componentes PanelCopias, VistaTodo, ListaView, TablaView,
+                           DialogoTabla, Dialogos y servicios ExportadorEtiquetas (guardar/copiar) y SelectorArchivos
 ```
 
 Flujo: `LectorArchivos` → páginas (texto + dibujo) → `Extractor*` → `Sesion` (listas) → `ExcelEtiquetas` → .xlsx.

@@ -1,7 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Etiquetador.Core;
 
 // Línea de comandos del etiquetador (sin ventana). Sirve para comprobar la lectura y comparar con la versión Python.
 //   EtiquetadorCli --prueba ARCHIVO            escribe ARCHIVO.prueba.txt (mismo formato que «EtiquetadorCuadros --prueba»)
