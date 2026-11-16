@@ -6,7 +6,7 @@ Tres proyectos. La lógica vive en `Core` (sin dependencias de interfaz); `Cli` 
 src/
 ├─ Etiquetador.Core        Lógica (namespace Etiquetador.Core.*)
 │  ├─ Modelos/             Datos puros: Borna, Elemento, Cable, Pagina, TextoPos, Geometria (Trazo, Flecha…), IFila, ErrorLectura
-│  ├─ Lectura/             Entrada de archivos: LectorArchivos (reparte por extensión), LectorPdf, LectorDxf (+DWG), LectorTabla (Excel/CSV), LectorOcr
+│  ├─ Lectura/             Entrada de archivos: LectorArchivos (reparte por extensión), LectorPdf, LectorDxf (+DWG, repartido en Lectura/Dxf: analizador, extractor de textos, separador de hojas, conversor DWG), LectorTabla (Excel/CSV), LectorOcr
 │  ├─ Extraccion/          Interpretación del esquema
 │  │    ExtractorBornas · ExtractorElementos · ExtractorCables (+ SeguimientoDeHilos)
 │  │    ImportadorTabla · IdentificadorEsquema · Multiplicador
