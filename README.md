@@ -2,6 +2,7 @@
 
 **Lee el esquema eléctrico de un cuadro y genera las etiquetas para marcar bornas, aparatos y cables, listas para importar en GeniusPro (Cembre).**
 
+[![Compilar](https://github.com/MrSanch20/Generador-de-etiquetas-.net/actions/workflows/build.yml/badge.svg)](https://github.com/MrSanch20/Generador-de-etiquetas-.net/actions/workflows/build.yml)
 ![.NET 8](https://img.shields.io/badge/.NET-8-512BD4)
 ![Avalonia 11](https://img.shields.io/badge/UI-Avalonia%2011-8B44AC)
 
